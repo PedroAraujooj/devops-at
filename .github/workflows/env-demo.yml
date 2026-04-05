@@ -12,4 +12,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Mostrar variável
-        run: echo "Ambiente de deploy: $DEPLOY_ENV"
+        run: 'echo "Ambiente de deploy: $DEPLOY_ENV"'
