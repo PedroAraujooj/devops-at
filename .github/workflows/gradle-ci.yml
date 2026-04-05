@@ -4,10 +4,40 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: ufology
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: devops2025!
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ufology"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: devops2025!
 
     steps:
       - name: Checkout do código
@@ -21,6 +51,14 @@ jobs:
 
       - name: Dar permissão ao Maven Wrapper
         run: chmod +x mvnw
+
+      - name: Instalar cliente PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Aplicar schema do banco
+        run: psql -h localhost -U postgres -d ufology -f docker/database/01_schema.sql
+        env:
+          PGPASSWORD: devops2025!
 
       - name: Build com Maven
         run: ./mvnw clean verify
