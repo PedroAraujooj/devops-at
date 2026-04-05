@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ufology
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ufology-postgres
+  namespace: ufology
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ufology-postgres
+  template:
+    metadata:
+      labels:
+        app: ufology-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: leogloriainfnet/ufodb:1.0-win
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: "devops2025!"
+            - name: POSTGRES_DB
+              value: ufology
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ufology-postgres
+  namespace: ufology
+spec:
+  selector:
+    app: ufology-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ufology-redis
+  namespace: ufology
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ufology-redis
+  template:
+    metadata:
+      labels:
+        app: ufology-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ufology-redis
+  namespace: ufology
+spec:
+  selector:
+    app: ufology-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: ufology
+data:
+  DB_NAME: "ufology"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secret
+  namespace: ufology
+type: Opaque
+stringData:
+  DB_PASSWORD: "devops2025!"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ufo-tracker
+  namespace: ufology
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ufo-tracker
+  template:
+    metadata:
+      labels:
+        app: ufo-tracker
+    spec:
+      containers:
+        - name: ufo-tracker
+          image: pedroaraujooj/ufo-tracker:1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DB_NAME
+
+            - name: POSTGRES_USERNAME
+              value: postgres
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_PASSWORD
+
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://ufology-postgres:5432/$(DB_NAME)
+
+            - name: SPRING_DATA_REDIS_HOST
+              value: ufology-redis
+
+            - name: SPRING_DATA_REDIS_PORT
+              value: "6379"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ufo-tracker-service
+  namespace: ufology
+spec:
+  selector:
+    app: ufo-tracker
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+#kubectl apply -f k8s/ufology-stack.yaml
+
+#kubectl get all -n ufology
+#kubectl get configmap -n ufology
+#kubectl get secret -n ufology
+#kubectl describe deployment ufo-tracker -n ufology
+#kubectl logs deployment/ufo-tracker -n ufology
